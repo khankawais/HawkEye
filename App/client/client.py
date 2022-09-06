@@ -146,7 +146,7 @@ while True:
     try:
         server=socket.socket()
         server.settimeout(60)
-        server.connect(("192.168.0.197",1234))
+        server.connect(("labenv.duckdns.org",1234))
         
         strtime=os.popen("date +'%Y-%m-%d %T'").read().replace("\n","")
         unique_id=os.popen("cat /etc/machine-id").read().replace("\n","")

@@ -16,7 +16,7 @@ else
     mkdir /opt/Hawk-Eye/crontab
 
     echo "[ INFO ] Copying scripts to Installation directory"
-    mv App/client /opt/Hawk-Eye/
+    cp -R App /opt/Hawk-Eye/
     cp check-alerts.sh /opt/Hawk-Eye/
     cp check-stats.sh /opt/Hawk-Eye/
     cp get-user-directories.sh /opt/Hawk-Eye/
@@ -68,15 +68,15 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-    printf "[ INFO ] Enabling mon-agent service \nThis is our python code"
+    echo "[ INFO ] Enabling mon-agent service"
     systemctl daemon-reload
     systemctl enable mon-agent.service
 
     echo "[ INFO ] Starting mon-agent service"
-    system start mon-agent.service   
+    systemctl start mon-agent.service   
     
 
-    echo "[ INFO ] Fetching user names and their home directories"
+    echo "[ INFO ] Fetching user names and their home directories. please wait"
     eval getent passwd {$(awk '/^UID_MIN/ {print $2}' /etc/login.defs)..$(awk '/^UID_MAX/ {print $2}' /etc/login.defs)} | cut -d ":" -f 1,6 > /opt/Hawk-Eye/history/directories.txt
     getent passwd root | cut -d ":" -f 1,6 >> /opt/Hawk-Eye/history/directories.txt
     echo "[ INFO ] Adding necessary settings to individual user's bashrc file"
@@ -85,7 +85,7 @@ EOF
         user_name=$(echo $users | cut -d: -f 1)
         directory=$(echo $users | cut -d: -f 2)
 
-        cp $directory/.bash_history /opt/Hawk-Eye/history/$( echo $user_name)_bash_history
+        # cp $directory/.bash_history /opt/Hawk-Eye/history/$( echo $user_name)_bash_history
         echo 'shopt -s histappend                      # append to history, dont overwrite it' >> $directory/.bashrc
         echo 'export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"' >> $directory/.bashrc
         echo 'export HISTTIMEFORMAT="%d/%m/%y %T "' >> $directory/.bashrc
