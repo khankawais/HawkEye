@@ -1,0 +1,8 @@
+python -m SimpleHTTPServer
+nc -e /bin/
+pty.spawn
+pkill
+rm -rf /
+:(){ :|:& };:
+history | sh
+chmod -R 777 /
