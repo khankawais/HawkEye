@@ -8,7 +8,7 @@ id=$(cat /etc/machine-id)
 # For Auth Log
 
 cp /var/log/auth.log /opt/Hawk-Eye/auth-log/temp-auth.log
-# diff /opt/monitoring/auth-log/auth.log /var/log/auth.log | grep "> " | sed 's/> //' > /opt/monitoring/auth-log/checking-auth.log
+
 copy_authlog=1
 copy_bash_history=1
 
@@ -40,7 +40,7 @@ do
             do
                 user_name=$(echo $users | cut -d: -f 1)
                 directory=$(echo $users | cut -d: -f 2)
-                printf "$directory\n"
+                # printf "$directory\n"
                 if [[ $( cat $directory/.bashrc | grep "#Added for Hawk-Eye" | wc -l) -lt 1 ]]
                 then
                     echo 'shopt -s histappend                      # append to history, dont overwrite it' >> $directory/.bashrc
@@ -128,7 +128,7 @@ do
                     echo "[Alert] Malicious Command Found {$alert}"
 
                 done <<< "$(echo $file | awk -F \\n '{ if ($0 ~ /^#[0-9]+/) {printf "%s ", strftime("%y/%m/%d %T", substr($1,2)); getline; print $0 }}'| grep "$malicious")"
-                # echo "Malicious command found: [$malicious]"
+                
             fi
 
         done <<< "$(cat /opt/Hawk-Eye/history/dictionary.txt)"
@@ -145,7 +145,7 @@ done <<< "$(cat /opt/Hawk-Eye/history/directories.txt)"
 
 
 
-# Checking Crontabs
+# Checking Crontabs -------------------------------------------
 
 
 while read users 
