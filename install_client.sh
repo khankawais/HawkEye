@@ -16,7 +16,7 @@ else
     mkdir /opt/Hawk-Eye/crontab
 
     echo "[ INFO ] Copying scripts to Installation directory"
-    cp -R App /opt/Hawk-Eye/
+    cp -R App/client /opt/Hawk-Eye/App
     cp check-alerts.sh /opt/Hawk-Eye/
     cp check-stats.sh /opt/Hawk-Eye/
     cp get-user-directories.sh /opt/Hawk-Eye/
@@ -61,7 +61,7 @@ After=network.target
 User=mon-agent
 Group=hawk-eye
 Type=simple
-ExecStart= $(which python3) /opt/Hawk-Eye/App/client/client.py
+ExecStart= $(which python3) /opt/Hawk-Eye/App/client.py
 Restart=always
 
 [Install]
