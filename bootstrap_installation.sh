@@ -14,10 +14,14 @@ else
     mkdir /opt/Hawk-Eye/auth-log
     mkdir /opt/Hawk-Eye/history
     mkdir /opt/Hawk-Eye/crontab
-    echo "[ INFO ] Copying Auth log to installation directory"
-
+    mv App /opt/Hawk-Eye/
+    
+    
+    echo "[ INFO ] Copying Dictionary to installation directory"
     cp dictionary.txt /opt/Hawk-Eye/history/dictionary.txt
+    echo "[ INFO ] Copying API creds to installation directory"
     cp api_creds.txt /opt/Hawk-Eye/api_creds.txt
+    echo "[ INFO ] Copying Auth log to installation directory"
     cp /var/log/auth.log /opt/Hawk-Eye/auth-log/auth.log
 
     echo "[ INFO ] Fetching user names and their home directories"
