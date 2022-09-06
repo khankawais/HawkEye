@@ -14,8 +14,18 @@ else
     mkdir /opt/Hawk-Eye/auth-log
     mkdir /opt/Hawk-Eye/history
     mkdir /opt/Hawk-Eye/crontab
-    mv App/client /opt/Hawk-Eye/
 
+    echo "[ INFO ] Copying scripts to Installation directory"
+    mv App/client /opt/Hawk-Eye/
+    cp check-alerts.sh /opt/Hawk-Eye/
+    cp check-stats.sh /opt/Hawk-Eye/
+    cp get-user-directories.sh /opt/Hawk-Eye/
+
+    echo "[ INFO ] Adding scripts to crontab"
+    (crontab -l; echo "@reboot bash /opt/Hawk-Eye/get-user-directories.sh") | sort -u | crontab -
+    (crontab -l; echo "* * * * * bash /opt/Hawk-Eye/check-stats.sh") | sort -u | crontab -
+
+    echo "[ INFO ] Installing python dependencies"
     pip3 install -r App/client/requirements.txt
 
     echo "[ INFO ] Creating new user"
@@ -61,8 +71,10 @@ EOF
     printf "[ INFO ] Enabling mon-agent service \nThis is our python code"
     systemctl daemon-reload
     systemctl enable mon-agent.service
+
     echo "[ INFO ] Starting mon-agent service"
     system start mon-agent.service   
+    
 
     echo "[ INFO ] Fetching user names and their home directories"
     eval getent passwd {$(awk '/^UID_MIN/ {print $2}' /etc/login.defs)..$(awk '/^UID_MAX/ {print $2}' /etc/login.defs)} | cut -d ":" -f 1,6 > /opt/Hawk-Eye/history/directories.txt
