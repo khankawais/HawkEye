@@ -14,15 +14,55 @@ else
     mkdir /opt/Hawk-Eye/auth-log
     mkdir /opt/Hawk-Eye/history
     mkdir /opt/Hawk-Eye/crontab
-    mv App /opt/Hawk-Eye/
+    mv App/client /opt/Hawk-Eye/
+
+    pip3 install -r App/client/requirements.txt
+
+    echo "[ INFO ] Creating new user"
+    useradd --system --no-create-home --shell=/sbin/nologin mon-agent
+    echo "[ INFO ] Creating new group"
+    groupadd hawk-eye
+    echo "[ INFO ] Adding root user to the new group"
+    usermod -Ghawk-eye "root"
+    echo "[ INFO ] Adding mon-agent user to the new group"
+    usermod -Ghawk-eye "mon-agent"
     
+    echo "[ INFO ] Changing permissions for the Installation directory"
+    chgrp -R hawk-eye /opt/Hawk-Eye
+    chmod -R 070 /opt/Hawk-Eye
     
+
     echo "[ INFO ] Copying Dictionary to installation directory"
     cp dictionary.txt /opt/Hawk-Eye/history/dictionary.txt
     echo "[ INFO ] Copying API creds to installation directory"
     cp api_creds.txt /opt/Hawk-Eye/api_creds.txt
     echo "[ INFO ] Copying Auth log to installation directory"
     cp /var/log/auth.log /opt/Hawk-Eye/auth-log/auth.log
+
+    echo "[ INFO ] Copying service config file to systemd folder"
+
+    cat <<EOF > /etc/systemd/system/mon-agent.service
+[Unit]
+Description=Hawk-Eye monitoring agent
+Wants=network.target
+After=network.target
+
+[Service]
+User=mon-agent
+Group=hawk-eye
+Type=simple
+ExecStart= $(which python3) /opt/Hawk-Eye/App/client/client.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    printf "[ INFO ] Enabling mon-agent service \nThis is our python code"
+    systemctl daemon-reload
+    systemctl enable mon-agent.service
+    echo "[ INFO ] Starting mon-agent service"
+    system start mon-agent.service   
 
     echo "[ INFO ] Fetching user names and their home directories"
     eval getent passwd {$(awk '/^UID_MIN/ {print $2}' /etc/login.defs)..$(awk '/^UID_MAX/ {print $2}' /etc/login.defs)} | cut -d ":" -f 1,6 > /opt/Hawk-Eye/history/directories.txt
