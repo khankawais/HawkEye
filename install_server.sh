@@ -14,9 +14,7 @@ else
     
     echo "[ INFO ] Copying scripts to Installation directory"
     cp -R App/server /opt/Hawk-Eye/App
-    
-    echo "[ INFO ] Adding scripts to crontab"
-    
+      
     echo "[ INFO ] Installing python dependencies"
     pip3 install -r App/server/requirements.txt
 
@@ -37,14 +35,14 @@ else
 
     echo "[ INFO ] Copying service config file to systemd folder"
 
-    cat <<EOF > /etc/systemd/system/mon-agent.service
+    cat <<EOF > /etc/systemd/system/hawk-eye.service
 [Unit]
-Description=Hawk-Eye monitoring agent
+Description=Hawk-Eye Server
 Wants=network.target
 After=network.target
 
 [Service]
-User=mon-agent
+User=hawk-eye
 Group=hawk-eye
 Type=simple
 ExecStart= $(which python3) /opt/Hawk-Eye/App/server.py
@@ -54,11 +52,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-    echo "[ INFO ] Enabling mon-agent service"
+    echo "[ INFO ] Enabling hawk-eye service"
     systemctl daemon-reload
-    systemctl enable mon-agent.service
+    systemctl enable hawk-eye.service
 
-    echo "[ INFO ] Starting mon-agent service"
-    systemctl start mon-agent.service   
+    echo "[ INFO ] Starting hawk-eye service"
+    systemctl start hawk-eye.service   
        
 fi
