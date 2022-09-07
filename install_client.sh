@@ -11,23 +11,11 @@ export DEBIAN_FRONTEND=noninteractive
 if [ $(id -u) != 0 ];then
     printf " \n[X] You must be root to run the script\n"
      
-
 else
 
-    yum update
-    if [ $? -gt 0 ];then
-        printf "\n  The current os is not CentOS or Redhat.\n
-
-            Switching to Ubuntu
-
-        "
-        echo "[ INFO ] Installing dependencies"
-        apt update
-        apt install net-tools curl python3 python3-pip -y
-    else
-        yum update
-        yum install net-tools curl python3 python3-pip -y
-    fi
+    echo "[ INFO ] Installing dependencies"
+    apt update
+    apt install net-tools curl python3 python3-pip -y
     echo "[ INFO ] Creating necessary directories"
     mkdir /opt/Hawk-Eye
     mkdir /opt/Hawk-Eye/auth-log
