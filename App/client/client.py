@@ -8,7 +8,7 @@ import requests
 from requests.auth import HTTPBasicAuth as request_auth
 
 
-
+from config import *
 import socket
 from io import StringIO
 import _thread
@@ -146,7 +146,7 @@ while True:
     try:
         server=socket.socket()
         server.settimeout(60)
-        server.connect(("labenv.duckdns.org",1234))
+        server.connect((server_address,server_port))
         
         strtime=os.popen("date +'%Y-%m-%d %T'").read().replace("\n","")
         unique_id=os.popen("cat /etc/machine-id").read().replace("\n","")

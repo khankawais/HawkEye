@@ -27,8 +27,6 @@ latest_alerts=[]
 latest_data=[]
 
 query_queue=[]
-host=""
-port=""
 s=None
 
 def create_scocket():
@@ -579,7 +577,7 @@ def change_alert_status():
 create_scocket()
 
 _thread.start_new_thread(run_mysql, ())
-_thread.start_new_thread(app.run, ('0.0.0.0',5000))
+_thread.start_new_thread(app.run, ('127.0.0.1',5000))
 
 
 

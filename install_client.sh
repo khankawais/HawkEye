@@ -1,14 +1,33 @@
+################################################################################
+# Author : Awais Khan                                                          #
+# Use this script as a root user.                                              #
+# This script is used to install the client on a  linux system                 #
+#                                                                              #
+################################################################################
+
 # set -x
 export DEBIAN_FRONTEND=noninteractive
 
 if [ $(id -u) != 0 ];then
     printf " \n[X] You must be root to run the script\n"
      
+
 else
 
-    echo "[ INFO ] Installing dependencies"
-    apt update
-    apt install net-tools curl python3 python3-pip -y
+    yum update
+    if [ $? -gt 0 ];then
+        printf "\n  The current os is not CentOS or Redhat.\n
+
+            Switching to Ubuntu
+
+        "
+        echo "[ INFO ] Installing dependencies"
+        apt update
+        apt install net-tools curl python3 python3-pip -y
+    else
+        yum update
+        yum install net-tools curl python3 python3-pip -y
+    fi
     echo "[ INFO ] Creating necessary directories"
     mkdir /opt/Hawk-Eye
     mkdir /opt/Hawk-Eye/auth-log
@@ -24,6 +43,7 @@ else
     echo "[ INFO ] Adding scripts to crontab"
     (crontab -l; echo "@reboot bash /opt/Hawk-Eye/get-user-directories.sh") | sort -u | crontab -
     (crontab -l; echo "* * * * * bash /opt/Hawk-Eye/check-stats.sh") | sort -u | crontab -
+    (crontab -l; echo "* * * * * bash /opt/Hawk-Eye/check-alerts.sh") | sort -u | crontab -
 
     echo "[ INFO ] Installing python dependencies"
     pip3 install -r App/client/requirements.txt
