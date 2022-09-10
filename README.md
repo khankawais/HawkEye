@@ -1,2 +1,2 @@
 # HawkEye
-Linux monitoring solution.
+Monitoring solution for Debian based Linux.
