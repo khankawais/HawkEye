@@ -152,10 +152,11 @@ while True:
         unique_id=os.popen("cat /etc/machine-id").read().replace("\n","")
         hostname=os.popen("hostname").read().replace("\n","")
         loggedin_users=os.popen("who| awk '{print $1}'|sort -u").read()
+        timezone=os.popen("timedatectl | grep 'Time zone' | cut -d ':' -f 2 | cut -d ' ' -f 2").read()
         # loggedin_users=list(filter(None, loggedin_users)) # Removing empty element from the list, because in this case after splitting the string we get an empty element in the list
         # loggedin_users=','.join(loggedin_users)
         
-        system_info=f"time:{strtime};;,id:{unique_id};;,hostname:{hostname};;,users:{loggedin_users}"
+        system_info=f"time:{strtime};;,time_zone:{timezone};;,id:{unique_id};;,hostname:{hostname};;,users:{loggedin_users}"
         server.send(bytes(system_info,"utf-8"))
         server.recv(1024).decode("utf-8") # Just receiving confirmation that the data was received by server
         
@@ -184,6 +185,3 @@ while True:
         time.sleep(5)
     finally:
         server.close()
-        
-        
-    

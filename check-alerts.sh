@@ -3,7 +3,8 @@ IFS=''
 #Get the unique id
 id=$(cat /etc/machine-id)
 
-
+#Get the timezone of the machine
+timezone=$(timedatectl | grep "Time zone" | cut -d ":" -f 2 | cut -d " " -f 2)
 
 # For Auth Log
 
@@ -23,7 +24,7 @@ do
     then
         echo "Alert to Generate: $line"
         
-        out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,id:$id;;,$line" -u $(cat /opt/Hawk-Eye/api_creds.txt)) 
+        out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,time_zone:$timezone;;,id:$id;;,$line" -u $(cat /opt/Hawk-Eye/api_creds.txt)) 
         if [[ "$out" != "Alert has been logged by the server" ]]
         then
             copy_authlog=0
@@ -118,7 +119,7 @@ do
                 do
                     echo "Alert to Generate: $alert"
         
-                    out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,id:$id;;,Malicious Command:$alert" -u $(cat /opt/Hawk-Eye/api_creds.txt)) 
+                    out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,time_zone:$timezone;;,id:$id;;,Malicious Command:$alert" -u $(cat /opt/Hawk-Eye/api_creds.txt)) 
                     if [[ "$out" != "Alert has been logged by the server" ]]
                     then
                         copy_bash_history=0
@@ -162,7 +163,7 @@ do
     if [[ $( echo $difference | grep -E "<|>" | wc -l) -gt 0 ]]
     then
         echo "Generating Alert for crontab"
-        out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,id:$id;;,Crontab:Before:$(cat /opt/Hawk-Eye/crontab/$( echo $user_name)_crontab);,;,After:$new_crontab" -u $(cat /opt/Hawk-Eye/api_creds.txt))
+        out=$(curl -Gs "127.0.0.1:5000/api/v1/alerts" --data-urlencode alert="time:$(date +'%Y-%m-%d %T');;,time_zone:$timezone;;,id:$id;;,Crontab:Before:$(cat /opt/Hawk-Eye/crontab/$( echo $user_name)_crontab);,;,After:$new_crontab" -u $(cat /opt/Hawk-Eye/api_creds.txt))
         if [[ "$out" != "Alert has been logged by the server" ]]
         then
             copy_crontab=0
