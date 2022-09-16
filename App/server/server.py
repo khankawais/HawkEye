@@ -695,18 +695,30 @@ def get_ports():
 @auth.login_required
 @cross_origin()
 def get_alerts():
-
+    r_type=str(request.args['type'])
     if 'id' in request.args:
         r_id=str(request.args['id'])
-        if r_id != "":
+        
+        if r_id != "" and r_type !="":
             id=r_id.replace("'","") # Just replacing ' so that it doesnt break the query
-            query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}';"
-            
+            if r_type == "custom":
+                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type LIKE 'Custom Alert:%';"
+            else:
+                
+                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type NOT LIKE 'Custom Alert:%';"
     elif 'status' in request.args:
         r_status=str(request.args['status'])
-        query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}';"
+        if r_type != "":
+            if r_type == "custom":
+                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type LIKE 'Custom Alert:%';"
+            else:  
+                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type NOT LIKE 'Custom Alert:%';"
     else:
-        query=f"SELECT * FROM {mysql_db}.alerts;"
+        if r_type != "":
+            if r_type == "custom":
+                query=f"SELECT * FROM {mysql_db}.alerts where alert_type LIKE 'Custom Alert:%';"
+            else:
+                query=f"SELECT * FROM {mysql_db}.alerts where alert_type NOT LIKE 'Custom Alert:%';"
     results=get_from_db(query)
 
     for result in results:
@@ -747,80 +759,105 @@ def change_alert_status():
 @auth.login_required
 @cross_origin()
 def get_custom_alerts():
-    check_custom_alerts()
-    results=""
-    if 'id' in request.args:
-        r_id=str(request.args['id']).replace("'","")
-        if r_id != "":
-            query=f"SELECT * FROM {mysql_db}.custom_alerts_settings where client_id='{r_id}';"
-            results=get_from_db(query)
-            return(json.dumps(results))
-    else:
-        allowed_custom_alert_types=["cpu","memory","disk"]
-        # check_custom_alerts()
-        return(json.dumps({"allowed_types":allowed_custom_alert_types}))
 
-@app.route('/api/v1/clients/update_custom_alert', methods=['POST'])
-def update_custom_alert():
-    if request.method == "POST":
-        client_id = str(request.form.get("client_id")).replace("'","")
-        alert_id = str(request.form.get("alert_id")).replace("'","")
-        alert_type=str(request.form.get("alert_type")).replace("'","")
-        threshold=str(request.form.get("threshold")).replace("'","")
-        if alert_type == "disk":
-            filesystem=str(request.form.get("filesystem")).replace("'","")
-            query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}', filesystem='{filesystem}' WHERE (`id` = '{alert_id}');" 
-        else:   
-            query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}' WHERE (`id` = '{alert_id}');"
-        #UPDATE `hawk_eye`.`custom_alerts_settings` SET `type` = 'disk1', `threshold` = '351', `file_system` = 'None1' WHERE (`id` = '3');
-
-
-
-
-@app.route('/api/v1/clients/del_custom_alert', methods=['POST'])
-def del_custom_alert():
-    if request.method == "POST":
-        client_id = str(request.form.get("client_id")).replace("'","")
-        alert_id = str(request.form.get("alert_id")).replace("'","")
+    # check_custom_alerts()
+    if request.method == "GET":
+        if request.headers.get('Content-Type') == "application/json":
+            prams=request.get_json()
+            results=""
+            if 'id' in prams:
+                r_id=str(prams.get("id")).replace("'","")
+                if r_id != "":
+                    query=f"SELECT * FROM {mysql_db}.custom_alerts_settings where client_id='{r_id}';"
+                    results=get_from_db(query)
+                    return(json.dumps(results))
+            
+            else:
+                allowed_custom_alert_types=["cpu","memory","disk"]
+                # check_custom_alerts()
+                return(json.dumps({"allowed_types":allowed_custom_alert_types}))
+        else:
+            return(json.dumps({"message":"Bad request"}))
         
-        if client_id != "" and alert_id != "":
-            client_id=client_id.replace("'","")
-            alert_id=alert_id.replace("'","")
-            query=f"DELETE FROM {mysql_db}.custom_alerts_settings WHERE id='{alert_id}' and client_id='{client_id}';"
-            query_queue.append(query)
-            return("deleted")
+
+@app.route('/api/v1/clients/update_custom_alert', methods=['PUT'])
+def update_custom_alert():
+    if request.method == "PUT":
+        allowed_custom_alert_types=["cpu","memory","disk"]
+        if request.headers.get('Content-Type') == "application/json":
+            prams=request.get_json()
+            client_id = str(prams.get("client_id")).replace("'","")
+            alert_id = str(prams.get("alert_id")).replace("'","")
+            alert_type=str(prams.get("alert_type")).replace("'","")
+            threshold=str(prams.get("threshold")).replace("'","")
+            if alert_type in allowed_custom_alert_types:
+                if alert_type == "disk":
+                    filesystem=str(prams.get("filesystem")).replace("'","")
+                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}', files_ystem='{filesystem}' WHERE (`id` = '{alert_id}');" 
+                else:   
+                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}' WHERE (`id` = '{alert_id}');"
+                #UPDATE `hawk_eye`.`custom_alerts_settings` SET `type` = 'disk1', `threshold` = '351', `file_system` = 'None1' WHERE (`id` = '3');
+                query_queue.append(query)
+                return(json.dumps({"message":"Alert Updated"}))
+            else:
+                return(json.dumps({"message":"this alert type is not allowed"}))
+        else:
+            return(json.dumps({"message":"Content-Type not allowed"}))
+
+
+@app.route('/api/v1/clients/del_custom_alert', methods=['DELETE'])
+def del_custom_alert():
+    if request.method == "DELETE":
+        if 'client_id' in request.args and 'alert_id' in request.args:
+            client_id = str(request.args['client_id']).replace("'","")
+            alert_id = str(request.args['alert_id']).replace("'","")
+            if client_id != "" and alert_id != "":
+                client_id=client_id.replace("'","")
+                alert_id=alert_id.replace("'","")
+                query=f"DELETE FROM {mysql_db}.custom_alerts_settings WHERE id='{alert_id}' and client_id='{client_id}';"
+                query_queue.append(query)
+                return(json.dumps({"message":"Alert Deleted"}))
+        else:
+            return(json.dumps({"message":"Bad request"}))
             
 
 @app.route('/api/v1/clients/create_custom_alert', methods=['POST'])
 def create_custom_alert():
+    
     if request.method == "POST":
-       allowed_custom_alert_types=["cpu","memory","disk"]
-       try:
-        # getting input data from HTML form
-        client_id = request.form.get("client_id")
-        client_id=client_id.replace("'","")
-        alert_type = request.form.get("type")
-        alert_type=alert_type.replace("'","")
-        
-        threshold=request.form.get("threshold")
-        threshold=threshold.replace("'","")
-        created_at=str(datetime.now())[:19]
-
-        if alert_type.lower() in allowed_custom_alert_types:
-            if alert_type.lower() == "disk":
-                file_system=request.form.get("file_system")
+        if request.headers.get('Content-Type') == "application/json":
+            prams=request.get_json()
+            allowed_custom_alert_types=["cpu","memory","disk"]
+            try:
+                # getting input data from HTML form
+                client_id = str(prams.get("client_id"))
+                client_id=client_id.replace("'","")
+                alert_type = str(prams.get("type"))
+                alert_type=alert_type.replace("'","")
                 
-                query=f"INSERT INTO `{mysql_db}`.`custom_alerts_settings` (`client_id`, `time_created`, `type`, `threshold`,`file_system`) VALUES ('{client_id}', '{created_at}', '{alert_type}', '{threshold}', '{file_system}');"
-            else:
-                query=f"INSERT INTO `{mysql_db}`.`custom_alerts_settings` (`client_id`, `time_created`, `type`, `threshold`) VALUES ('{client_id}', '{created_at}', '{alert_type}', '{threshold}');"
-            query_queue.append(query)
-            return "Custom alert added to database"
-        else:
-            return "This alert type is not allowed"    
-       except:
-        return "Something went wrong"
+                threshold=str(prams.get("threshold"))
+                threshold=threshold.replace("'","")
+                created_at=str(datetime.now())[:19]
+
+                if alert_type.lower() in allowed_custom_alert_types:
+                    if alert_type.lower() == "disk":
+                        file_system=request.form.get("file_system")
+                        
+                        query=f"INSERT INTO `{mysql_db}`.`custom_alerts_settings` (`client_id`, `time_created`, `type`, `threshold`,`file_system`) VALUES ('{client_id}', '{created_at}', '{alert_type}', '{threshold}', '{file_system}');"
+                    else:
+                        query=f"INSERT INTO `{mysql_db}`.`custom_alerts_settings` (`client_id`, `time_created`, `type`, `threshold`) VALUES ('{client_id}', '{created_at}', '{alert_type}', '{threshold}');"
+                    query_queue.append(query)
+                    return(json.dumps({"message":"Custom alert added to database"}))
+                    
+                else:
+                    return(json.dumps({"message":"This alert type is not allowed"}))
+                        
+            except:
+                return(json.dumps({"message":"Something went wrong"}))
+        
 
 
+# client_id = str(request.form.get("client_id"))
 
 
 create_scocket()
