@@ -1,5 +1,6 @@
 from datetime import datetime
 from datetime import timedelta
+from ipaddress import ip_address
 from zoneinfo import available_timezones
 import pytz
 
@@ -23,6 +24,7 @@ import _thread
 import mysql.connector
 
 from config import *
+from logger import genlog
 
 latest_data_dict={}
 custom_alerts=[]
@@ -37,6 +39,7 @@ def create_scocket():
     global s
     s=socket.socket()
     print(f"Binding port -- > {str(port)}")
+    genlog.info(f"Binding port -- > {str(port)}")
     
     s.bind((host,port))
     s.listen(15)
@@ -78,14 +81,16 @@ def run_mysql():
         mysqlconnection=connect_mysql()
         cursor = mysqlconnection.cursor()   # Cursor object creater to execute MySQL Queries.
     except Exception as e:
-        print(e)
+        # print(e)
+        genlog.error(f"[ Error while connecting to MySQL ] {e}")
         while True:     
             try:
                 mysqlconnection=connect_mysql()
                 cursor = mysqlconnection.cursor()   # Cursor object creater to execute MySQL Queries.
                 break
             except Exception as e:
-                print(e)
+                # print(e)
+                genlog.error(f"[ Error while connecting to MySQL ] {e}")
         
     while True:
         if len(query_queue) > 0:
@@ -106,9 +111,11 @@ def run_mysql():
                     else:
                         query_queue.pop(0) # Query is not Insert,Update,Delete , so its garbage
                 except Exception as e:
-                    print(e)
+                    # print(e)
+                    genlog.error(f"[ Error with MySQL ] {e}")
                     if "error in your SQL syntax" in str(e):
-                        print(f"Syntax error: {e}")
+                        genlog.error(f"[ MySQL Syntax error ] {e}")
+                        # print(f"Syntax error: {e}")
                         query_queue.pop(0)
                     else:
                         while True:     
@@ -233,7 +240,8 @@ def process_stats(received_data):
     put_data_new(id,"Stats",stats_dict)
     query=f"INSERT INTO `{mysql_db}`.`stats` (`client_id`,`time`,`timezone`,`cpu`,`memory`,`disks`) VALUES ('{id}','{time}','{timezone}','{cpu}','{memory}','{disk}');"
     # print(query)
-    print("[INFO] Stats added to database")
+    genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] Stats added to database")
+    # print("[INFO] Stats added to database")
     query_queue.append(query)
 
 
@@ -275,7 +283,8 @@ def process_process_list(received_data):
     #     query=f"INSERT INTO `{mysql_db}`.`process_list` (`client_id`,`time`,`timezone`,`process_list`) VALUES ('{id}','{time}','{timezone}','{process_list}');"
     #     query_queue.append(query)
     #     print("[INFO] Process List added to database")
-    
+    genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] Process List received")
+
 def process_open_ports(received_data):
     add_to_db=True
     received_data=received_data.replace("'","") # Making sure the query doesnt break
@@ -304,7 +313,8 @@ def process_open_ports(received_data):
             del temp_latest_info["time"]
 
             if temp_latest_info == temp_open_ports:
-                print("[INFO] Open Ports received")
+                # print("[INFO] Open Ports received")
+                genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] Open Ports received")
                 add_to_db=False
           
     
@@ -313,7 +323,7 @@ def process_open_ports(received_data):
     if add_to_db:
         query=f"INSERT INTO `{mysql_db}`.`open_ports` (`client_id`,`time`,`timezone`,`open_ports`) VALUES ('{id}','{time}','{timezone}','{open_ports}');"
         query_queue.append(query)
-        print("[INFO] Open Ports added to database")
+        genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] Open Ports added to database")
 
 
 
@@ -362,7 +372,8 @@ def process_system_info(received_data):
             del temp_latest_info["time"]
             del temp_system_info["time"]
             if temp_latest_info == temp_system_info:
-                print("[INFO] System Info received")
+                # print("[INFO] System Info received")
+                genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] System Info received")
                 add_to_db=False
 
     put_data_new(id,"System Info",system_info_dict)
@@ -370,7 +381,8 @@ def process_system_info(received_data):
     if add_to_db:
         query=f"INSERT INTO `{mysql_db}`.`system_info` (`client_id`,`time`,`timezone`,`ip`,`users`,`hostname`) VALUES ('{id}','{time}','{timezone}','{ip}','{users}','{hostname}');"
         query_queue.append(query)
-        print("[INFO] System Info added to database")
+        # print("[INFO] System Info added to database")
+        genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] System Info added to database")
        
 
 
@@ -425,6 +437,7 @@ def process_alerts(received_data):
         
         query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{id}','{time}','{timezone}','{alert_type}','{alert}','{alert_description}','new','{hostname}');"
         query_queue.append(query)
+        genlog.info(f"[ {latest_data_dict[id]['System Info']['ip']} ] New Alert received")
 
 
 def put_data_new(id,data_type,data):
@@ -434,117 +447,151 @@ def put_data_new(id,data_type,data):
         latest_data_dict[id]={}
     
     latest_data_dict[id][data_type]=data
-
+    
 
 
 def check_custom_alerts():
-    query=f"SELECT * FROM {mysql_db}.custom_alerts_settings;"
-    results=get_from_db(query)
 
-    for result in results:
-        if result["client_id"] in latest_data_dict:
-            hostname=latest_data_dict[result["client_id"]]["System Info"]["host_name"]
-            timezone=latest_data_dict[result["client_id"]]["System Info"]["timezone"]
-            timezone=timezone.replace("\n","")
-            timezonepytz=pytz.timezone(timezone)
-            time_now=str(datetime.now(timezonepytz))[:19]
+    while True:
+        try:
+            query=f"SELECT * FROM {mysql_db}.custom_alerts_settings;"
+            results=get_from_db(query)
 
-            if result["type"] == "cpu":
-                cpu_values=[]    
-                
-                date_format_str = "%Y-%m-%d %H:%M:%S"
+            for result in results:
+                if result["client_id"] in latest_data_dict:
+                    hostname=latest_data_dict[result["client_id"]]["System Info"]["host_name"]
+                    timezone=latest_data_dict[result["client_id"]]["System Info"]["timezone"]
+                    timezone=timezone.replace("\n","")
+                    timezonepytz=pytz.timezone(timezone)
+                    time_now=str(datetime.now(timezonepytz))[:19]
 
-                time_now = datetime.strptime(time_now, date_format_str)
-                
-                lookup_time=time_now - timedelta(minutes=5)
-                time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
-                query=f"SELECT * FROM {mysql_db}.stats WHERE client_id='{result['client_id']}' AND time BETWEEN {time_range};"
-                
-                stats=get_from_db(query)
-
-                if len(stats) > 0:
-                    for stat in stats:
-                        if stat["cpu"] != "null":
-                            cpu_values.append(int(stat["cpu"]))
-                    
-                    total=sum(cpu_values)
-                    number_of_values=len(cpu_values)
-                    average_cpu_usage=total/number_of_values
-
-                    if average_cpu_usage > int(result["threshold"]):
-                        custom_alerts.append("test: CPU custom alert")
-                        alert="CPU usage has exceeded the threshold limit."
-                        alert_description=f"Current CPU usage is at {int(average_cpu_usage)}% which is greater than the threshold ({result['threshold']}%)"
-                        query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: CPU Usage','{alert}','{alert_description}','new','{hostname}');"
-                        query_queue.append(query)
-            
-            elif result["type"] == "memory":
-                memory_percentages=[]
-                
-                date_format_str = "%Y-%m-%d %H:%M:%S"
-                time_now = datetime.strptime(time_now, date_format_str)
-                lookup_time=time_now - timedelta(minutes=5)
-
-                time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
-
-                query=f"SELECT * FROM {mysql_db}.stats WHERE client_id='{result['client_id']}' AND time BETWEEN {time_range};"
-                
-                stats=get_from_db(query)
-
-                if len(stats) > 0:
-        
-                    for stat in stats:
-                        if stat["memory"] != "null":
-                            memory_dictionary={}
-                            memory_stats=stat["memory"].split("\n")
-                            memory_stats=list(filter(None, memory_stats)) # Removing empty element from the list, because in this case after splitting the string we get an empty element in the list
-                            memory_columns=memory_stats[0].split(" ")
-                            del memory_stats[0]
-                            values=memory_stats[0].split(" ")
-                            for index,value in enumerate(values):
-                                if "Gi" in value:
-                                    value=float(value.replace("Gi",""))
-                                    value=value*1000
-                                elif "Mi" in value:
-                                    value=float(value.replace("Mi",""))
-                                
-                                memory_dictionary[str(memory_columns[index]).lower()]=value
-
-                            percentage=((memory_dictionary["total"] - memory_dictionary["available"])/memory_dictionary["total"])*100
-
-                            memory_percentages.append(percentage)
+                    if result["type"] == "cpu":
+                        cpu_values=[]    
                         
+                        date_format_str = "%Y-%m-%d %H:%M:%S"
+
+                        time_now = datetime.strptime(time_now, date_format_str)
+                        
+                        lookup_time=time_now - timedelta(minutes=5)
+                        time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
+                        query=f"SELECT * FROM {mysql_db}.stats WHERE client_id='{result['client_id']}' AND time BETWEEN {time_range};"
+                        
+                        stats=get_from_db(query)
+
+                        if len(stats) > 0:
+                            for stat in stats:
+                                if stat["cpu"] != "null":
+                                    cpu_values.append(int(stat["cpu"]))
+                            
+                            total=sum(cpu_values)
+                            number_of_values=len(cpu_values)
+                            average_cpu_usage=total/number_of_values
+
+                            if average_cpu_usage > int(result["threshold"]):
+
+                                lookup_time=time_now - timedelta(days=1)
+                                time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
+                                
+                                query=f"SELECT * FROM {mysql_db}.alerts WHERE client_id='{result['client_id']}' AND alert_type='Custom Alert: CPU Usage' AND description LIKE '%than the threshold ({result['threshold']}%'  AND time BETWEEN {time_range};"
+                                alerts=get_from_db(query)
+
+                                if len(alerts) < 1:                        
+                                    alert="CPU usage has exceeded the threshold limit."
+                                    alert_description=f"Current CPU usage is at {int(average_cpu_usage)}% which is greater than the threshold ({result['threshold']}%)"
+                                    query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: CPU Usage','{alert}','{alert_description}','new','{hostname}');"
+                                    query_queue.append(query)
+                                    genlog.info(f"[ {latest_data_dict[result['client_id']]['System Info']['ip']} ] Generated a custom CPU Usage alert")
                     
-                    total=sum(memory_percentages)
-                    number_of_values=len(memory_percentages)
-                    average_memory_usage=total/number_of_values
+                    elif result["type"] == "memory":
+                        memory_percentages=[]
+                        
+                        date_format_str = "%Y-%m-%d %H:%M:%S"
+                        time_now = datetime.strptime(time_now, date_format_str)
+                        lookup_time=time_now - timedelta(minutes=5)
 
-                    if average_memory_usage > int(result["threshold"]):
-                        alert="Memory usage has exceeded the threshold limit."
-                        alert_description=f"Current Memory usage is at {int(average_memory_usage)}% which is greater than the threshold ({result['threshold']}%)"
-                        query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: Memory Usage','{alert}','{alert_description}','new','{hostname}');"
-                        query_queue.append(query)
+                        time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
+
+                        query=f"SELECT * FROM {mysql_db}.stats WHERE client_id='{result['client_id']}' AND time BETWEEN {time_range};"
+                        
+                        stats=get_from_db(query)
+
+                        if len(stats) > 0:
+                
+                            for stat in stats:
+                                if stat["memory"] != "null":
+                                    memory_dictionary={}
+                                    memory_stats=stat["memory"].split("\n")
+                                    memory_stats=list(filter(None, memory_stats)) # Removing empty element from the list, because in this case after splitting the string we get an empty element in the list
+                                    memory_columns=memory_stats[0].split(" ")
+                                    del memory_stats[0]
+                                    values=memory_stats[0].split(" ")
+                                    for index,value in enumerate(values):
+                                        if "Gi" in value:
+                                            value=float(value.replace("Gi",""))
+                                            value=value*1000
+                                        elif "Mi" in value:
+                                            value=float(value.replace("Mi",""))
+                                        
+                                        memory_dictionary[str(memory_columns[index]).lower()]=value
+
+                                    percentage=((memory_dictionary["total"] - memory_dictionary["available"])/memory_dictionary["total"])*100
+
+                                    memory_percentages.append(percentage)
+                                
+                            
+                            total=sum(memory_percentages)
+                            number_of_values=len(memory_percentages)
+                            average_memory_usage=total/number_of_values
+
+                            if average_memory_usage > int(result["threshold"]):
+                                
+                                lookup_time=time_now - timedelta(days=1)
+                                time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
+                                
+                                query=f"SELECT * FROM {mysql_db}.alerts WHERE client_id='{result['client_id']}' AND alert_type='Custom Alert: Memory Usage' AND description LIKE '%than the threshold ({result['threshold']}%'  AND time BETWEEN {time_range};"
+                                alerts=get_from_db(query)
+
+                                if len(alerts) < 1:
+                                    alert="Memory usage has exceeded the threshold limit."
+                                    alert_description=f"Current Memory usage is at {int(average_memory_usage)}% which is greater than the threshold ({result['threshold']}%)"
+                                    query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: Memory Usage','{alert}','{alert_description}','new','{hostname}');"
+                                    query_queue.append(query)
+                                    genlog.info(f"[ {latest_data_dict[result['client_id']]['System Info']['ip']} ] Generated a custom Memory Usage alert")
 
 
-            elif result["type"] == "disk":
-                threshold=result["threshold"]
-                file_system=result["file_system"]
+                    elif result["type"] == "disk":
+                        threshold=result["threshold"]
+                        file_system=result["file_system"]
 
-                if "Stats" in latest_data_dict[result["client_id"]]:
+                        if "Stats" in latest_data_dict[result["client_id"]]:
 
-                    disks=latest_data_dict[result["client_id"]]["Stats"]["disks"]
-                    for disk in disks:    
-                        if file_system == disk["filesystem"]:
-                            file_system_usage=disk["use%"].replace("%","")
-                            file_system_usage=int(file_system_usage)
-                            if file_system_usage > int(threshold):
-                                alert="Disk usage has exceeded the threshold limit."
-                                alert_description=f"Current Disk usage for the filesystem [ {file_system} ] is at {file_system_usage}% which is greater than the threshold ({result['threshold']}%)"
-                                query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: Disk Usage','{alert}','{alert_description}','new','{hostname}');"
-                                query_queue.append(query)
+                            disks=latest_data_dict[result["client_id"]]["Stats"]["disks"]
+                            for disk in disks:    
+                                if file_system == disk["filesystem"]:
+                                    file_system_usage=disk["use%"].replace("%","")
+                                    file_system_usage=int(file_system_usage)
+                                    if file_system_usage > int(threshold):
+                                        date_format_str = "%Y-%m-%d %H:%M:%S"
+                                        time_now = datetime.strptime(time_now, date_format_str)
+                                        lookup_time=time_now - timedelta(days=1)
+                                        time_range="{ts '"+str(lookup_time)+"'} AND {ts '"+str(time_now)+"'}"
+                                        
+                                        query=f"SELECT * FROM {mysql_db}.alerts WHERE client_id='{result['client_id']}' AND alert_type='Custom Alert: Disk Usage' AND description LIKE '%than the threshold ({result['threshold']}%' AND description LIKE '%for the filesystem [ {file_system}%'  AND time BETWEEN {time_range};"
+                                        alerts=get_from_db(query)
 
+                                        if len(alerts) < 1:
+                                            alert="Disk usage has exceeded the threshold limit."
+                                            alert_description=f"Current Disk usage for the filesystem [ {file_system} ] is at {file_system_usage}% which is greater than the threshold ({result['threshold']}%)"
+                                            query=f"INSERT INTO `{mysql_db}`.`alerts` (`client_id`,`time`,`timezone`,`alert_type`,`alert_text`,`description`,`status`,`host_name`) VALUES ('{result['client_id']}','{time_now}','{timezone}','Custom Alert: Disk Usage','{alert}','{alert_description}','new','{hostname}');"
+                                            query_queue.append(query)
+                                            genlog.info(f"[ {latest_data_dict[result['client_id']]['System Info']['ip']} ] Generated a custom Disk Usage alert")
+            time.sleep(5)    
+        except:
+            time.sleep(5)
+        
 def serve_client(client,addr):
     print(f"\n Connection from {addr} has been established")
+    genlog.info(f" Connection has been established from {addr[0]} on port {addr[1]}")
     received_data=receive_data(client).decode("utf-8")
     client.send(bytes("RECEIVED","utf-8"))
     received_data+=f";;,ip:{addr[0]}"
@@ -586,6 +633,7 @@ def serve_client(client,addr):
         except Exception as e:
             if id in latest_data_dict:
                 del latest_data_dict[id]
+            genlog.error(f"[ Client Disconnected {addr[0]} ] {e}")
             print(e)
             break
 
@@ -616,7 +664,7 @@ def home():
 
 #Get info about all clients
 @app.route('/api/v1/clients', methods=['GET'])
-@auth.login_required
+# @auth.login_required
 @cross_origin()
 def get_clients():
     if 'id' in request.args:
@@ -759,28 +807,24 @@ def change_alert_status():
 @auth.login_required
 @cross_origin()
 def get_custom_alerts():
-
-    # check_custom_alerts()
     if request.method == "GET":
-        if request.headers.get('Content-Type') == "application/json":
-            prams=request.get_json()
-            results=""
-            if 'id' in prams:
-                r_id=str(prams.get("id")).replace("'","")
-                if r_id != "":
-                    query=f"SELECT * FROM {mysql_db}.custom_alerts_settings where client_id='{r_id}';"
-                    results=get_from_db(query)
-                    return(json.dumps(results))
-            
-            else:
-                allowed_custom_alert_types=["cpu","memory","disk"]
-                # check_custom_alerts()
-                return(json.dumps({"allowed_types":allowed_custom_alert_types}))
+        results=""
+        if 'id' in request.args:
+            r_id=str(request.args['id']).replace("'","")
+            if r_id != "":
+                query=f"SELECT * FROM {mysql_db}.custom_alerts_settings where client_id='{r_id}';"
+                results=get_from_db(query)
+                return(json.dumps(results))
+        
         else:
-            return(json.dumps({"message":"Bad request"}))
+            allowed_custom_alert_types=["cpu","memory","disk"]
+            
+            return(json.dumps({"allowed_types":allowed_custom_alert_types}))
         
 
 @app.route('/api/v1/clients/update_custom_alert', methods=['PUT'])
+@auth.login_required
+@cross_origin()
 def update_custom_alert():
     if request.method == "PUT":
         allowed_custom_alert_types=["cpu","memory","disk"]
@@ -788,14 +832,14 @@ def update_custom_alert():
             prams=request.get_json()
             client_id = str(prams.get("client_id")).replace("'","")
             alert_id = str(prams.get("alert_id")).replace("'","")
-            alert_type=str(prams.get("alert_type")).replace("'","")
+            alert_type=str(prams.get("type")).replace("'","")
             threshold=str(prams.get("threshold")).replace("'","")
             if alert_type in allowed_custom_alert_types:
                 if alert_type == "disk":
-                    filesystem=str(prams.get("filesystem")).replace("'","")
-                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}', files_ystem='{filesystem}' WHERE (`id` = '{alert_id}');" 
+                    filesystem=str(prams.get("file_system")).replace("'","")
+                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET `type` = '{alert_type}', threshold='{threshold}', file_system='{filesystem}' WHERE (`id` = '{alert_id}');" 
                 else:   
-                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET type = '{alert_type}', threshold='{threshold}' WHERE (`id` = '{alert_id}');"
+                    query=f"UPDATE {mysql_db}.custom_alerts_settings SET `type` = '{alert_type}', threshold='{threshold}' WHERE (`id` = '{alert_id}');"
                 #UPDATE `hawk_eye`.`custom_alerts_settings` SET `type` = 'disk1', `threshold` = '351', `file_system` = 'None1' WHERE (`id` = '3');
                 query_queue.append(query)
                 return(json.dumps({"message":"Alert Updated"}))
@@ -803,9 +847,12 @@ def update_custom_alert():
                 return(json.dumps({"message":"this alert type is not allowed"}))
         else:
             return(json.dumps({"message":"Content-Type not allowed"}))
-
+    else:
+        return(json.dumps({"message":"Method not allowed"}))
 
 @app.route('/api/v1/clients/del_custom_alert', methods=['DELETE'])
+@auth.login_required
+@cross_origin()
 def del_custom_alert():
     if request.method == "DELETE":
         if 'client_id' in request.args and 'alert_id' in request.args:
@@ -822,6 +869,8 @@ def del_custom_alert():
             
 
 @app.route('/api/v1/clients/create_custom_alert', methods=['POST'])
+@auth.login_required
+@cross_origin()
 def create_custom_alert():
     
     if request.method == "POST":
@@ -855,6 +904,12 @@ def create_custom_alert():
             except:
                 return(json.dumps({"message":"Something went wrong"}))
         
+@app.after_request
+def after_request(response):
+  response.headers['Access-Control-Allow-Methods']='*'
+  response.headers['Access-Control-Allow-Origin']='*'
+  response.headers['Vary']='Origin'
+  return response
 
 
 # client_id = str(request.form.get("client_id"))
@@ -862,11 +917,13 @@ def create_custom_alert():
 
 create_scocket()
 
-_thread.start_new_thread(run_mysql, ())
-_thread.start_new_thread(app.run, ('0.0.0.0',5000))
+_thread.start_new_thread(run_mysql, ()) # Running the custom function in background that will execute mysql queries like INSERT, UPDATE, DELETE.
+_thread.start_new_thread(check_custom_alerts, ()) # This will create a thread for checking the custom alerts in the background.
+_thread.start_new_thread(app.run, ('0.0.0.0',5000)) # Creating seperate thread for running the flask API app
+
 
 
 
 while True:
     client,addr=s.accept()
-    _thread.start_new_thread(serve_client,(client,addr))
+    _thread.start_new_thread(serve_client,(client,addr)) # Creating a seperate thread for serving each client
