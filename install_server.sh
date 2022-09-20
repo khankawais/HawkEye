@@ -11,6 +11,7 @@ else
     apt install python3 python3-pip -y
     echo "[ INFO ] Creating necessary directories"
     mkdir /opt/Hawk-Eye
+    mkdir /var/log/Hawk-Eye
     
     echo "[ INFO ] Copying scripts to Installation directory"
     cp -R App/server /opt/Hawk-Eye/App

@@ -1,7 +1,7 @@
 ################################################################################
 # Author : Awais Khan                                                          #
 # Use this script as a root user.                                              #
-# This script is used to install the client on a  linux system                 #
+# This script is used to install the client on a Debian system                 #
 #                                                                              #
 ################################################################################
 
@@ -21,6 +21,7 @@ else
     mkdir /opt/Hawk-Eye/auth-log
     mkdir /opt/Hawk-Eye/history
     mkdir /opt/Hawk-Eye/crontab
+    mkdir /var/log/Hawk-Eye
 
     echo "[ INFO ] Copying scripts to Installation directory"
     cp -R App/client /opt/Hawk-Eye/App

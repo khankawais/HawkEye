@@ -7,13 +7,17 @@ from flask_cors import CORS,cross_origin
 import requests
 from requests.auth import HTTPBasicAuth as request_auth
 
-
-from config import *
 import socket
 from io import StringIO
 import _thread
 import time
 import os
+
+
+from config import *
+from logger import genlog
+
+
 
 
 priority_queue=[]
@@ -52,6 +56,7 @@ def authlog_alert():
         r_alert=str(request.args['alert'])
         if r_alert != "":
             priority_queue.append(f"Alert:{r_alert}")
+            genlog.info(f"New Alert generated")
         
         return("Alert has been logged by the server")
 
@@ -64,7 +69,7 @@ def stats():
         r_stats=str(request.args['stats'])
         if r_stats != "":
             data_queue.append(f"Stats:{r_stats}")
-        
+            genlog.info(f"Stats Received")
         return("OK")
 
 @app.route('/api/v1/statistics/listprocesses', methods=['GET'])
@@ -75,6 +80,7 @@ def list_processes():
         r_list=str(request.args['list'])
         if r_list != "":
             data_queue.append(f"Process List:{r_list}")
+            genlog.info(f"Process List Received")
             return("OK")
 
 @app.route('/api/v1/statistics/open-ports', methods=['GET'])
@@ -85,6 +91,7 @@ def open_ports():
         r_ports=str(request.args['data'])
         if r_ports != "":
             data_queue.append(f"Open Ports:{r_ports}")
+            genlog.info(f"Open Ports Received")
         
         return("OK")
 
@@ -96,6 +103,7 @@ def system_info():
         r_info=str(request.args['info'])
         if r_info != "":
             data_queue.append(f"System Info:{r_info}")
+            genlog.info(f"System Info Received")
         
         return("OK")
 
@@ -147,6 +155,7 @@ while True:
         server=socket.socket()
         server.settimeout(60)
         server.connect((server_address,server_port))
+        genlog.info(f"Connected to the Server {server_address} at port {server_port}")
         
         strtime=os.popen("date +'%Y-%m-%d %T'").read().replace("\n","")
         unique_id=os.popen("cat /etc/machine-id").read().replace("\n","")
@@ -181,7 +190,8 @@ while True:
                 time.sleep(3)
             time.sleep(0.5)
     except Exception as e:
-        print(e)
+        genlog.error(f"Disconnected from server : {e}")
+        # print(e)
         time.sleep(5)
     finally:
         server.close()
