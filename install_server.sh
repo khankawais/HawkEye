@@ -14,7 +14,7 @@ else
     mkdir /var/log/Hawk-Eye
     
     echo "[ INFO ] Copying scripts to Installation directory"
-    cp -R App/server /opt/Hawk-Eye/App
+    cp -R App/server/* /opt/Hawk-Eye/App
       
     echo "[ INFO ] Installing python dependencies"
     pip3 install -r App/server/requirements.txt
