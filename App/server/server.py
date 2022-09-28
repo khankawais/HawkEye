@@ -209,7 +209,7 @@ def process_stats(received_data):
                 available_memory=float(memory_dictionary["available"].replace("Gi","").replace("Mi",""))
 
             
-            percentage=((total_memory-available_memory)/total_memory)*100
+            percentage=int(((total_memory-available_memory)/total_memory)*100)
 
             memory_dictionary["percentage"]=percentage
             stats_dict["memory"]=memory_dictionary
@@ -612,7 +612,6 @@ def serve_client(client,addr):
                 if received_data.startswith("Alert:"):
                     received_data=received_data.replace("Alert:","")
                     process_alerts(received_data)
-
                 elif received_data.startswith("Stats:"):
                     received_data=received_data.replace("Stats:","")
                     process_stats(received_data)
@@ -750,23 +749,23 @@ def get_alerts():
         if r_id != "" and r_type !="":
             id=r_id.replace("'","") # Just replacing ' so that it doesnt break the query
             if r_type == "custom":
-                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type LIKE 'Custom Alert:%' ORDER BY time desc;"
             else:
                 
-                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type NOT LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where client_id='{id}' and alert_type NOT LIKE 'Custom Alert:%' ORDER BY time desc;"
     elif 'status' in request.args:
         r_status=str(request.args['status'])
         if r_type != "":
             if r_type == "custom":
-                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type LIKE 'Custom Alert:%' ORDER BY time desc;"
             else:  
-                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type NOT LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where status='{r_status}' and alert_type NOT LIKE 'Custom Alert:%' ORDER BY time desc;"
     else:
         if r_type != "":
             if r_type == "custom":
-                query=f"SELECT * FROM {mysql_db}.alerts where alert_type LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where alert_type LIKE 'Custom Alert:%' ORDER BY time desc;"
             else:
-                query=f"SELECT * FROM {mysql_db}.alerts where alert_type NOT LIKE 'Custom Alert:%';"
+                query=f"SELECT * FROM {mysql_db}.alerts where alert_type NOT LIKE 'Custom Alert:%' ORDER BY time desc;"
     results=get_from_db(query)
 
     for result in results:

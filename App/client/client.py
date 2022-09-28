@@ -18,8 +18,6 @@ from config import *
 from logger import genlog
 
 
-
-
 priority_queue=[]
 data_queue=[]
 
@@ -112,8 +110,6 @@ def system_info():
 
 _thread.start_new_thread(app.run, ('127.0.0.1',5000))
 
-
-
  
 def receive_data(socket):
     received_data=(socket.recv(1024))
@@ -149,7 +145,6 @@ def send_data_string(socket,data):
         socket.send(bytes(data,"utf-8"))
          
  
-
 while True:
     try:
         server=socket.socket()

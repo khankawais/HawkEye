@@ -49,6 +49,8 @@ else
     echo "[ INFO ] Changing permissions for the Installation directory"
     chgrp -R hawk-eye /opt/Hawk-Eye
     chmod -R 070 /opt/Hawk-Eye
+    chgrp -R hawk-eye /var/log/Hawk-Eye
+    chmod -R 070 /var/log/Hawk-Eye
     
 
     echo "[ INFO ] Copying Dictionary to installation directory"
